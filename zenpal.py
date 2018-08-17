@@ -1,6 +1,7 @@
 import csv
 import datetime
 import sys
+import forex_python.converter
 
 ACCOUNT_CURR = 'USD'
 CONVERSION = 'General Currency Conversion'
@@ -22,6 +23,12 @@ def to_unixtime(rrow):
 def to_isodate(s):
     return str(datetime.datetime.strptime(s, "%d/%m/%Y"))
 
+
+def convert_cb(amount, curr, dt):
+    converter = forex_python.converter.CurrencyRates()
+    dt = datetime.datetime.utcfromtimestamp(dt)
+    rate = converter.get_rate(curr, ACCOUNT_CURR, dt)
+    return str(rate * float(amount))  # Difference with PayPal rate ranges from 0.95 to 1.12, it's the same on average.
 
 
 def load(filename):
@@ -62,35 +69,38 @@ def load(filename):
 
             else:
                 if row[Currency] == ACCOUNT_CURR:
-                    # a=1
-                    out_lines.append(['TRAN', to_isodate(row[Date]), row[Name], row[Type], row[Amount]])
+                    out_lines.append([to_isodate(row[Date]), row[Name], row[Type], row[Amount]])
                 else:
                     pending_trans.append(row)
 
             line_count += 1
 
     for row in pending_trans:
-        if row[Amount] in conv.get(row[Currency], {}):
-            conv_lists = conv[row[Currency]][row[Amount]]
+        abs_amount = row[Amount].replace("-", "")
+        usd_amount = None
+        if abs_amount in conv.get(row[Currency], {}):
+            conv_lists = conv[row[Currency]][abs_amount]
+            tr_time = to_unixtime(row)
             if len(conv_lists) == 1:
                 conv_list = conv_lists[0]
             else:
-                tr_time = to_unixtime(row)
                 conv_list = conv_lists[0]
                 curr_diff = abs(conv_list[DT] - tr_time)
                 for x in conv_lists:
                     if abs(x[DT] - tr_time) < curr_diff:
                         curr_diff = abs(x[DT] - tr_time)
                         conv_list = x
-            out_lines.append(['TRAN_', to_isodate(row[Date]), row[Name], row[Type], conv_list[AMT], row[Currency] + " " + row[Amount]])
-        # else:
-        #     out_lines.append(
-        #         ['TRAN_', to_isodate(row[Date]), row[Name], row[Type], 'NaN', row[Currency] + " " + row[Amount]])
+            if abs(conv_list[DT] - tr_time) <= 60*60*24:
+                usd_amount = conv_list[AMT]
+        if not usd_amount:
+            print("WARN: fetching {} {} from forex".format(row[Amount], row[Currency]), file=sys.stderr)
+            usd_amount = convert_cb(row[Amount], row[Currency], to_unixtime(row))
+        out_lines.append([to_isodate(row[Date]), row[Name], row[Type] + " (" + row[Amount] + " " + row[Currency] + ")",
+                          usd_amount])
 
     return out_lines
 
 
 if __name__ == "__main__":
     for line in load('Download.CSV'):
-        # a=0
         print("\t".join(line))
