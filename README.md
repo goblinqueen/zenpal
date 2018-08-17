@@ -8,4 +8,4 @@ PayPay statement can be acquired here: https://business.paypal.com/merchantdata/
 
 Zenmoney csv import interface is here: https://zenmoney.ru/a/#import
 
-$ python3 zenpal.py > zenpal.csv
+    $ python3 zenpal.py > zenpal.csv
