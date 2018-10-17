@@ -105,12 +105,30 @@ def load(filename):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument('-f', '--file', required=False, help='Path or name of the file you wish to edit',
-                        default='Download.CSV')
+    parser.add_argument('-f', '--file', required=True, help='Path or name of the file you wish to edit')
+    parser.add_argument('-o', '--output_file', required=False, help='Path or name of the desired output file. Optional')
+    parser.add_argument('-a', '--append', type=bool, required=False,
+                        help="'True' will add to existing file\n 'False' will create a new output file")
 
     args = parser.parse_args()
     infile = args.file
+    outfile = args.output_file
     output_writer = csv.writer(sys.stdout, delimiter=';', quoting=csv.QUOTE_MINIMAL)
 
-    for line in load(infile):
-        output_writer.writerow(line)
+    try:
+        if args.output_file:
+            if args.append:
+                with open(outfile, 'at', newline='') as f:
+                    file_writer = csv.writer(f, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+                    for line in load(infile):
+                        file_writer.writerow(line)
+            else:
+                with open(outfile, 'wt', newline='') as f:
+                    file_writer = csv.writer(f, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+                    for line in load(infile):
+                        file_writer.writerow(line)
+        else:
+            for line in load(infile):
+                output_writer.writerow(line)
+    except FileNotFoundError:
+        parser.error("{} file or path does not exist please try again.".format(args.file))
