@@ -2,6 +2,7 @@ import csv
 import datetime
 import sys
 import forex_python.converter
+from argparse import ArgumentParser
 
 ACCOUNT_CURR = 'USD'
 CONVERSION = 'General Currency Conversion'
@@ -10,7 +11,7 @@ DT, AMT = 1, 0
 
 Currency = 'Currency'
 Amount = 'Amount'
-Date = '\ufeff"Date"'
+Date = 'Date'
 Time = 'Time'
 Type = 'Type'
 Name = 'Name'
@@ -32,9 +33,15 @@ def convert_cb(amount, curr, dt):
 
 
 def load(filename):
-    with open(filename) as csv_file:
 
-        csv_reader = csv.reader(csv_file, delimiter=',')
+
+    def pre_process(data):
+        for row in data:
+            yield row.replace('\ufeff', '')
+
+
+    with open(filename) as csv_file:
+        csv_reader = csv.reader(pre_process(csv_file), delimiter=',')
         line_count = 0
         header = {}
         out_lines = []
@@ -43,8 +50,6 @@ def load(filename):
         pending_conv = {}
 
         for row in csv_reader:
-            # if line_count > 40:
-            #     break
             if not header:
                 header = row
                 continue
@@ -102,5 +107,12 @@ def load(filename):
 
 
 if __name__ == "__main__":
-    for line in load('Download.CSV'):
+    parser = ArgumentParser()
+    parser.add_argument('-f', '--file', required=False, help='Path or name of the file you wish to edit',
+                        default='Download.CSV')
+
+    args = parser.parse_args()
+    infile = args.file
+
+    for line in load(infile):
         print("\t".join(line))
