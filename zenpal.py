@@ -33,12 +33,9 @@ def convert_cb(amount, curr, dt):
 
 
 def load(filename):
-
-
     def pre_process(data):
         for row in data:
             yield row.replace('\ufeff', '')
-
 
     with open(filename) as csv_file:
         csv_reader = csv.reader(pre_process(csv_file), delimiter=',')
@@ -95,7 +92,7 @@ def load(filename):
                     if abs(x[DT] - tr_time) < curr_diff:
                         curr_diff = abs(x[DT] - tr_time)
                         conv_list = x
-            if abs(conv_list[DT] - tr_time) <= 60*60*24:
+            if abs(conv_list[DT] - tr_time) <= 60 * 60 * 24:
                 usd_amount = conv_list[AMT]
         if not usd_amount:
             print("WARN: fetching {} {} from forex".format(row[Amount], row[Currency]), file=sys.stderr)
@@ -113,6 +110,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     infile = args.file
+    output_writer = csv.writer(sys.stdout, delimiter=';', quoting=csv.QUOTE_MINIMAL)
 
     for line in load(infile):
-        print("\t".join(line))
+        output_writer.writerow(line)
