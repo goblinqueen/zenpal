@@ -2,6 +2,7 @@ import csv
 import datetime
 import sys
 import forex_python.converter
+from argparse import ArgumentParser
 
 ACCOUNT_CURR = 'USD'
 CONVERSION = 'General Currency Conversion'
@@ -102,5 +103,12 @@ def load(filename):
 
 
 if __name__ == "__main__":
-    for line in load('Download.CSV'):
+    parser = ArgumentParser()
+    parser.add_argument('-f', '--file', required=False, help='Path or name of the file you wish to edit',
+                        default='Download.CSV')
+
+    args = parser.parse_args()
+    infile = args.file
+
+    for line in load(infile):
         print("\t".join(line))
