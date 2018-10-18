@@ -8,9 +8,11 @@ PayPay statement can be acquired here: https://business.paypal.com/merchantdata/
 
 Zenmoney csv import interface is here: https://zenmoney.ru/a/#import
 
-Place the file called Download.csv in the same directory as the script, then run from the command line:
+The file called Download.csv can be placed anywhere (take note of the file location). Then run from a command line:
 
-    $ python3 zenpal.py [-h] -f FILE [-o OUTPUT_FILE] [-a APPEND]
+    $ python3 zenpal.py -f ./Download.csv -o Converted.csv -a True
+	
+This will parse the Download.csv file and append the converted content to Converted.csv
     
     optional arguments:
         -h, --help            show this help message and exit
