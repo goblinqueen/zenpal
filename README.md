@@ -10,7 +10,7 @@ Zenmoney csv import interface is here: https://zenmoney.ru/a/#import
 
 The downloaded statement can be placed anywhere (take note of the file location). Then run from a command line:
 
-    $ python3 zenpal.py -f ./Download.csv -o Converted.csv -a
+    $ ./zenpal.py -f ./Download.csv -o Converted.csv -a
 
 This will parse the Download.csv file and append the converted content to Converted.csv
 
