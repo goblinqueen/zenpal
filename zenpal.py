@@ -31,7 +31,7 @@ def convert_cb(amount, curr, dt):
     converter = forex_python.converter.CurrencyRates()
     dt = datetime.datetime.utcfromtimestamp(dt)
     rate = converter.get_rate(curr, ACCOUNT_CURR, dt)
-    return str(rate * float(amount))  # Difference with PayPal rate ranges from 0.95 to 1.12, it's the same on average.
+    return "{0:.2f}".format(rate * float(amount))
 
 
 def load(filename):
