@@ -8,9 +8,9 @@ PayPay statement can be acquired here: https://business.paypal.com/merchantdata/
 
 Zenmoney csv import interface is here: https://zenmoney.ru/a/#import
 
-The downloaded statement can be placed anywhere (take note of the file location). Then run from a command line:
+The downloaded statement can be placed anywhere (take note of the file location). Then run from the command line:
 
-    $ ./zenpal.py -f ./Download.csv -o Converted.csv -a
+    $ ./zenpal.py -f Download.csv -o Converted.csv -a
 
 This will parse the Download.csv file and append the converted content to Converted.csv
 
@@ -23,3 +23,12 @@ This will parse the Download.csv file and append the converted content to Conver
                         'True' will add to existing file 'False' will create a
                         new output file
 
+
+# known issues
+
+    forex_python.converter.RatesNotAvailableError: Currency Rates Source Not Ready
+
+Caused by: https://github.com/MicroPyramid/forex-python/issues/65
+Updating forex-python directly from git usually helps:
+
+    pip install git+https://github.com/MicroPyramid/forex-python.git
