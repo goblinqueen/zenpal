@@ -29,6 +29,7 @@ This will parse the Download.csv file and append the converted content to Conver
     forex_python.converter.RatesNotAvailableError: Currency Rates Source Not Ready
 
 Caused by: https://github.com/MicroPyramid/forex-python/issues/65
+
 Updating forex-python directly from git usually helps:
 
     pip install git+https://github.com/MicroPyramid/forex-python.git
