@@ -19,11 +19,11 @@ Type = 'Type'
 Name = 'Name'
 
 
-def to_unixtime(rrow):
-    return int(datetime.datetime.strptime(rrow[Date] + ' ' + rrow[Time], "%d/%m/%Y %H:%M:%S").timestamp())
+def to_unix_time(data_row):
+    return int(datetime.datetime.strptime(data_row[Date] + ' ' + data_row[Time], "%d/%m/%Y %H:%M:%S").timestamp())
 
 
-def to_isodate(s):
+def to_iso_date(s):
     return str(datetime.datetime.strptime(s, "%d/%m/%Y"))
 
 
@@ -36,8 +36,8 @@ def convert_cb(amount, curr, dt):
 
 def load(filename):
     def pre_process(data):
-        for row in data:
-            yield row.replace('\ufeff', '')
+        for data_row in data:
+            yield data_row.replace('\ufeff', '')
 
     with open(filename) as csv_file:
         csv_reader = csv.reader(pre_process(csv_file), delimiter=',')
@@ -55,7 +55,7 @@ def load(filename):
             row = dict(zip(header, row))
             row[Amount] = row[Amount].replace(",", "")
             if row[Type] == CONVERSION:
-                dkey = to_unixtime(row)
+                dkey = to_unix_time(row)
 
                 pending_conv[dkey] = pending_conv.get(dkey, {})
                 pending_conv[dkey][row[Currency]] = row[Amount]
@@ -73,7 +73,7 @@ def load(filename):
 
             else:
                 if row[Currency] == ACCOUNT_CURR:
-                    out_lines.append([to_isodate(row[Date]), row[Name], row[Type], row[Amount]])
+                    out_lines.append([to_iso_date(row[Date]), row[Name], row[Type], row[Amount]])
                 else:
                     pending_trans.append(row)
 
@@ -84,7 +84,7 @@ def load(filename):
         usd_amount = None
         if abs_amount in conv.get(row[Currency], {}):
             conv_lists = conv[row[Currency]][abs_amount]
-            tr_time = to_unixtime(row)
+            tr_time = to_unix_time(row)
             if len(conv_lists) == 1:
                 conv_list = conv_lists[0]
             else:
@@ -98,8 +98,8 @@ def load(filename):
                 usd_amount = conv_list[AMT]
         if not usd_amount:
             print("WARN: fetching {} {} from forex".format(row[Amount], row[Currency]), file=sys.stderr)
-            usd_amount = convert_cb(row[Amount], row[Currency], to_unixtime(row))
-        out_lines.append([to_isodate(row[Date]), row[Name], row[Type] + " (" + row[Amount] + " " + row[Currency] + ")",
+            usd_amount = convert_cb(row[Amount], row[Currency], to_unix_time(row))
+        out_lines.append([to_iso_date(row[Date]), row[Name], row[Type] + " (" + row[Amount] + " " + row[Currency] + ")",
                           usd_amount])
 
     return out_lines
