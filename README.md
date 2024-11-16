@@ -1,5 +1,5 @@
 # ZenPal
-Yet another Zenmoney API library, mostly to work with csv exports with sources that wouldn't cooperatge otherwize.
+Yet another Zenmoney API library, mostly to work with csv exports with sources that wouldn't cooperate otherwize.
 
 Refer to main.py with my personal usage as an example
 
