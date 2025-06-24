@@ -50,8 +50,8 @@ def get_updates(zen, _filename, _acc_id):
                 if not _zen.get(_n, None) == _op.get(_n, None):
                     return False
 
-            if _zen.get('deleted'):
-                print(_op)
+            # if _zen.get('deleted'):
+            #     print(_op)
             return True
 
         search = [x for x in zen.transaction if check(x, line)]
@@ -84,12 +84,31 @@ def main():
     filename = 'zenmoney.json'
 
     zen = load_or_sync(filename, token)
-    in_dates = '20240901-20241126'
+
+    # look for /Users/eltha/Downloads/tapahtumat{} files and find the latest one
+
+    in_files = [f for f in os.listdir('/Users/eltha/Downloads/') if f.startswith('tapahtumat') and f.endswith('.csv')]
+    if not in_files:
+        print('No files found in /Users/eltha/Downloads/')
+        return
+
+    in_files.sort(reverse=True)  # Sort files by name, assuming the latest one has the highest name
+    latest_file = in_files[0]
+    print(f'Using latest file: {latest_file}')
+
+    # Set the date range based on the latest file name
+    if 'tapahtumat' in latest_file:
+        in_dates = latest_file[len('tapahtumat'):-4]  # Remove prefix and '.csv'
+    else:
+        print('Unable to determine date range from file name.')
+        return
+
+    print(f'Using date range: {in_dates}')
 
     op_files = [
-        # (f'/Users/eltha/Downloads/tapahtumat{in_dates}.csv', OP_EUR_ID),
+        (f'/Users/eltha/Downloads/tapahtumat{in_dates}.csv', OP_EUR_ID),
         (f'/Users/eltha/Downloads/tapahtumat{in_dates} (1).csv', OP_FAMILY_ID),
-        # (f'/Users/eltha/Downloads/tapahtumat{in_dates} (2).csv', OP_MONEY_BOX),
+        (f'/Users/eltha/Downloads/tapahtumat{in_dates} (2).csv', OP_MONEY_BOX),
     ]
 
     # print([x for x in zen.account if 'OP M' in x['title']])
