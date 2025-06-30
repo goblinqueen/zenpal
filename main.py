@@ -85,11 +85,10 @@ def main():
 
     zen = load_or_sync(filename, token)
 
-    # look for /Users/eltha/Downloads/tapahtumat{} files and find the latest one
-
-    in_files = [f for f in os.listdir('/Users/eltha/Downloads/') if f.startswith('tapahtumat') and f.endswith('.csv')]
+    BASE_FILENAME = '/Users/eltha/Downloads/'
+    in_files = [f for f in os.listdir(BASE_FILENAME) if f.startswith('tapahtumat') and f.endswith('.csv')]
     if not in_files:
-        print('No files found in /Users/eltha/Downloads/')
+        print(f'No files found in {BASE_FILENAME} starting with "tapahtumat" and ending with ".csv".')
         return
 
     in_files.sort(reverse=True)  # Sort files by name, assuming the latest one has the highest name
@@ -115,7 +114,7 @@ def main():
 
     for op_file in op_files:
         print()
-        print(zen.get_by_value('account', 'id', op_file[1])[0]['title'])
+        print(zen.get_by_value('account', 'id', op_file[1])[0]['title'], op_file[0])
         diff = get_updates(zen, op_file[0], op_file[1])
         print(f'Updating {len(diff["transaction"])} items')
         load_or_sync(filename, token, out_diff=diff)
