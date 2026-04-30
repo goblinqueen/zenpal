@@ -6,7 +6,7 @@ OP_FAMILY_ID = '50ca9746-f13a-4b67-adbb-1fe8f7f28439'
 OP_EUR_ID = 'f02f21c3-2686-4c78-a3da-cc4c776fba93'
 OP_MONEY_BOX = '052b718d-74f1-4e25-b1fa-5f7b9e7a7ca4'
 
-from op import OPReader
+from zenmoney.op import OPReader
 import zenmoney
 
 def load_or_sync(filename, token, out_diff=None):

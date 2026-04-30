@@ -9,15 +9,15 @@ import threading
 import time
 
 import pandas as pd
-import zenmoney as zenmod
+from zenmoney import zenmoney as zenmod
 from dateutil.relativedelta import relativedelta
 from flask import Flask, render_template_string, request, redirect, url_for, jsonify
 
 from config import ZEN_API_TOKEN
 from zp import (load_or_sync, get_updates, detect_op_files,
                 find_candidates, _build_transfer, MERGE_RULES, ACCOUNT_SLOTS, DOWNLOADS)
-from pipeline import Predictor, MANUAL_TAGS
-from train import train_model
+from prediction.pipeline import Predictor, MANUAL_TAGS
+from prediction.train import train_model
 
 FILENAME   = 'zenmoney.json'
 OUTPUT_CSV = 'review_output.csv'

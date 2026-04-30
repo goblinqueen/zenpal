@@ -8,11 +8,11 @@ from catboost import CatBoostClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 
-from pipeline import MANUAL_TAGS, OP_FAMILY_ID, apply_pre_rules
+from prediction.pipeline import MANUAL_TAGS, OP_FAMILY_ID, apply_pre_rules
 from rules import _tag_name_map
 
-MODEL_PATH      = 'model.cbm'
-FEATURES_PATH   = 'model_features.json'
+MODEL_PATH      = '../model.cbm'
+FEATURES_PATH   = '../model_features.json'
 MIN_CLASS_SAMPLES = 10
 ITERATIONS = 200
 

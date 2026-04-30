@@ -9,7 +9,7 @@ import webbrowser
 
 from config import ZEN_API_TOKEN, ZEN_USER
 import zenmoney
-from op import OPReader
+from zenmoney.op import OPReader
 
 FILENAME     = 'zenmoney.json'
 DOWNLOADS    = r'C:\Users\eltha\Downloads'
@@ -241,7 +241,7 @@ def cmd_import(args):
 
     try:
         import pandas as pd
-        from pipeline import Predictor
+        from prediction.pipeline import Predictor
         predictor = Predictor()
         local_tag_map = {t['id']: t['title'] for t in zen.tag}
         enriched = [t for t in zen.transaction if t['id'] in new_ids]
@@ -371,11 +371,11 @@ def cmd_merge(args):
 
 
 def cmd_serve(args):
-    import web_review
+    import web_server
     url = f'http://localhost:{args.port}'
     threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     print(f'Serving at {url}  (Ctrl+C to stop)')
-    web_review.app.run(debug=False, port=args.port)
+    web_server.app.run(debug=False, port=args.port)
 
 
 def cmd_zen(_args):

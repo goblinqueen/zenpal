@@ -3,7 +3,7 @@ import json
 class ZenConnection:
 
     BASE_URL = 'https://api.zenmoney.ru/v8/diff/'
-    FILE_NAME = 'zenmoney.json'
+    FILE_NAME = '../zenmoney.json'
 
     def __init__(self, token:str, last_sync_timestamp:int=0) -> None:
         self._token = token
