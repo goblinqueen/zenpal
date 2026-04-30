@@ -59,13 +59,23 @@ class Zenmoney:
     def load(cls, filename):
         with open(filename) as f:
             zdict = json.load(f)
+        for key in ['instrument', 'company', 'user', 'account',
+                    'tag', 'merchant', 'reminder', 'reminderMarker', 'transaction']:
+            if key in zdict:
+                seen = {}
+                for item in zdict[key]:
+                    seen[item['id']] = item
+                zdict[key] = list(seen.values())
         return cls(zdict)
 
     def apply_diff(self, diff: dict) -> None:
         for field_name in ['instrument', 'company', 'user', 'account',
                            'tag', 'merchant', 'budget', 'reminder', 'reminderMarker', 'transaction']:
             if field_name in diff:
-                self._zdict[field_name] = self._zdict.get(field_name, []) + diff[field_name]
+                existing = {x['id']: x for x in self._zdict.get(field_name, [])}
+                for item in diff[field_name]:
+                    existing[item['id']] = item
+                self._zdict[field_name] = list(existing.values())
                 print(f"Updated {field_name}: {len(diff[field_name])} item(s)")
 
             if 'deletion' in diff:
@@ -82,6 +92,12 @@ class Zenmoney:
     def write(self, filename):
         with open(filename, 'w') as f:
             f.write(json.dumps(self._zdict))
+
+    def set_tags(self, transaction_id: str, tag_ids: list) -> dict:
+        """Return a diff that sets tags on a transaction, ready to pass to ZenConnection.sync."""
+        import time
+        txn = next(t for t in self.transaction if t['id'] == transaction_id)
+        return {'transaction': [{**txn, 'tag': tag_ids, 'changed': int(time.time())}]}
 
 
     def get_by_value(self, prop, field, value):
