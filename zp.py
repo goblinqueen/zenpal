@@ -92,6 +92,7 @@ def get_updates(zen, csv_file, acc_id):
 # Import helpers
 # ---------------------------------------------------------------------------
 
+
 def detect_op_files(downloads_dir):
     """Return (date_suffix, [(path, acc_id, label), ...]) for the latest tapahtumat group."""
     try:
@@ -234,8 +235,41 @@ def cmd_import(args):
         print('Aborted.')
         return
 
-    load_or_sync(out_diff={'transaction': all_new})
-    print('Done.')
+    new_ids = {t['id'] for t in all_new}
+    print('Pushing raw transactions...')
+    zen = load_or_sync(out_diff={'transaction': all_new})
+
+    try:
+        import pandas as pd
+        from pipeline import Predictor
+        predictor = Predictor()
+        local_tag_map = {t['id']: t['title'] for t in zen.tag}
+        enriched = [t for t in zen.transaction if t['id'] in new_ids]
+        df = pd.DataFrame(enriched)
+        df['date'] = pd.to_datetime(df['date'])
+        df_tagged = predictor.tag(df, zen)
+
+        tag_updates = []
+        print()
+        for row in df_tagged.to_dict('records'):
+            tag_id = row.get('final_tag')
+            tag_name = local_tag_map.get(tag_id, '(no tag)') if tag_id else '(no tag)'
+            payee = row.get('originalPayee') or row.get('payee') or ''
+            amt = row.get('outcome', 0) or 0
+            amt_s = f"-{amt:.2f}" if amt else f"+{row.get('income', 0):.2f}"
+            date_s = pd.Timestamp(row['date']).strftime('%Y-%m-%d')
+            print(f"  {date_s}  {amt_s:>10}  {payee[:38]:<38}  → {tag_name}")
+            if tag_id:
+                tag_updates.extend(zen.set_tags(row['id'], [tag_id])['transaction'])
+
+        if tag_updates:
+            print()
+            load_or_sync(out_diff={'transaction': tag_updates})
+            print(f'Applied tags to {len(tag_updates)}/{len(all_new)} transaction(s).')
+        else:
+            print('\nNo tags to apply.')
+    except Exception as e:
+        print(f'Warning: prediction failed ({e}), transactions pushed without tags.')
 
 
 def cmd_reimport(args):

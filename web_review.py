@@ -32,8 +32,11 @@ WINDOW_DEFAULT = {
 # ---------------------------------------------------------------------------
 app = Flask(__name__)
 
-zen       = load_or_sync(FILENAME, ZEN_API_TOKEN)
-predictor = Predictor()
+zen = load_or_sync(FILENAME, ZEN_API_TOKEN)
+try:
+    predictor = Predictor()
+except Exception:
+    predictor = None
 
 tag_map     = {t['id']: t['title'] for t in zen.tag}
 tag_id_map  = {t['title']: t['id'] for t in zen.tag}
@@ -96,6 +99,10 @@ def _reload_zen():
     tags_sorted = sorted(zen.tag, key=lambda t: t['title'])
     df_all      = pd.DataFrame(zen.transaction)
     df_all['date'] = pd.to_datetime(df_all['date'])
+    try:
+        predictor = Predictor()
+    except Exception:
+        predictor = None
     return zen
 
 
@@ -502,7 +509,7 @@ DATA_TEMPLATE = """<!doctype html><html lang="en"><head>
       <div id="prev-area" style="margin-top:12px"></div>
       <div id="push-row" class="push-row" style="display:none">
         <form method="post" action="/import/push">
-          <button class="btn btn-primary">Push to Zenmoney</button>
+          <button class="btn btn-primary">Push &amp; Predict</button>
         </form>
         <span class="push-note" id="push-note"></span>
       </div>
@@ -553,7 +560,7 @@ function doPreview() {
           h += '</table>';
         }
         area.innerHTML = h;
-        document.getElementById('push-note').textContent = data.total + ' transaction(s) ready to push';
+        document.getElementById('push-note').textContent = data.total + ' transaction(s) — will predict tags after push';
         document.getElementById('push-row').style.display = 'flex';
       }
       btn.textContent = 'Refresh'; btn.disabled = false;
@@ -784,11 +791,47 @@ def import_push():
             new_txns = get_updates(z, path, acc_id)['transaction']
             print(f'{label}: {len(new_txns)} new transaction(s)')
             all_new.extend(new_txns)
-        if all_new:
-            load_or_sync(FILENAME, ZEN_API_TOKEN, out_diff={'transaction': all_new})
-            print(f'Pushed {len(all_new)} transaction(s).')
-        else:
+        if not all_new:
             print('Nothing to import.')
+            _reload_zen()
+            return
+
+        new_ids = {t['id'] for t in all_new}
+        print(f'Pushing {len(all_new)} transaction(s)...')
+        z = load_or_sync(FILENAME, ZEN_API_TOKEN, out_diff={'transaction': all_new})
+
+        if predictor is None:
+            print('No model — transactions pushed without tags.')
+            _reload_zen()
+            return
+
+        print('Running predictions on enriched data...')
+        try:
+            local_tag_map = {t['id']: t['title'] for t in z.tag}
+            enriched = [t for t in z.transaction if t['id'] in new_ids]
+            df_new = pd.DataFrame(enriched)
+            df_new['date'] = pd.to_datetime(df_new['date'])
+            df_tagged = predictor.tag(df_new, z)
+
+            tag_updates = []
+            for row in df_tagged.to_dict('records'):
+                tag_id = row.get('final_tag')
+                tag_name = local_tag_map.get(tag_id, '(no tag)') if tag_id else '(no tag)'
+                payee = row.get('originalPayee') or row.get('payee') or ''
+                amt = row.get('outcome', 0) or 0
+                amt_s = f"-{amt:.2f}" if amt else f"+{row.get('income', 0):.2f}"
+                date_s = pd.Timestamp(row['date']).strftime('%Y-%m-%d')
+                print(f"  {date_s}  {amt_s:>10}  {payee[:38]:<38}  → {tag_name}")
+                if tag_id:
+                    tag_updates.extend(z.set_tags(row['id'], [tag_id])['transaction'])
+
+            if tag_updates:
+                load_or_sync(FILENAME, ZEN_API_TOKEN, out_diff={'transaction': tag_updates})
+                print(f'Applied tags to {len(tag_updates)}/{len(all_new)} transaction(s).')
+            else:
+                print('Predictions returned no tags.')
+        except Exception as e:
+            print(f'Warning: prediction failed ({e}), transactions pushed without tags.')
         _reload_zen()
 
     run_task(_fn)
