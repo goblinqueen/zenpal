@@ -11,8 +11,8 @@ from sklearn.metrics import classification_report
 from prediction.pipeline import MANUAL_TAGS, OP_FAMILY_ID, apply_pre_rules
 from rules import _tag_name_map
 
-MODEL_PATH      = '../model.cbm'
-FEATURES_PATH   = '../model_features.json'
+MODEL_PATH      = 'prediction/model.cbm'
+FEATURES_PATH   = 'prediction/model_features.json'
 MIN_CLASS_SAMPLES = 10
 ITERATIONS = 200
 
@@ -81,7 +81,8 @@ def train_model(zen, train_start: str, train_end: str, progress_fn=None) -> str:
 
     model = CatBoostClassifier(iterations=ITERATIONS, verbose=0,
                                cat_features=cat_features,
-                               text_features=text_features)
+                               text_features=text_features,
+                               train_dir='prediction/catboost_info')
     model.fit(X_train, y_train,
               callbacks=[_ProgressCallback(ITERATIONS, progress_fn)])
 
