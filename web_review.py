@@ -269,9 +269,9 @@ _NAV = """
   </form>
 </div>
 <div class="tabs">
-  <a href="/"      class="tab{% if active=='review' %} active{% endif %}">Review</a>
-  <a href="/data"  class="tab{% if active=='data'   %} active{% endif %}">Data</a>
-  <a href="/merge" class="tab{% if active=='merge'  %} active{% endif %}">Merge</a>
+  <a href="/data"    class="tab{% if active=='data'   %} active{% endif %}">Data</a>
+  <a href="/merge"   class="tab{% if active=='merge'  %} active{% endif %}">Merge</a>
+  <a href="/review"  class="tab{% if active=='review' %} active{% endif %}">Review</a>
 </div>
 """
 
@@ -648,6 +648,10 @@ MERGE_TEMPLATE = """<!doctype html><html lang="en"><head>
 
 @app.route('/')
 def index():
+    return redirect(url_for('review'))
+
+@app.route('/review')
+def review():
     w     = load_window()
     start = request.args.get('start', w['predict_start'])
     end   = request.args.get('end',   w['predict_end'])
@@ -662,7 +666,7 @@ def save():
     end   = request.form.get('end', '')
     rows, _ = parse_form(request.form)
     save_csv(rows)
-    return redirect(url_for('index', start=start, end=end,
+    return redirect(url_for('review', start=start, end=end,
                             message=f'Saved {len(rows)} row(s) to {OUTPUT_CSV}'))
 
 @app.route('/upload', methods=['POST'])
@@ -672,14 +676,14 @@ def upload():
     rows, tag_updates = parse_form(request.form)
     save_csv(rows)
     n = sync_tags(tag_updates)
-    return redirect(url_for('index', start=start, end=end,
+    return redirect(url_for('review', start=start, end=end,
                             message=f'Uploaded {n} tag(s), saved {len(rows)} row(s)'))
 
 @app.route('/advance', methods=['POST'])
 def advance():
     w = advance_window(load_window())
     save_window(w)
-    return redirect(url_for('index',
+    return redirect(url_for('review',
                             message=f'Window advanced → {w["predict_start"]} — {w["predict_end"]}'))
 
 
@@ -730,7 +734,7 @@ def retrain():
     run_task(_fn)
     return redirect(url_for('task_page', title='Training model',
                             subtitle=f'{w["train_start"]} → {w["train_end"]}',
-                            bar='1', back='/', active='review'))
+                            bar='1', back='/review', active='review'))
 
 
 # ---------------------------------------------------------------------------
