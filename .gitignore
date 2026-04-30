@@ -3,3 +3,7 @@ config.py
 zenmoney.json
 CLAUDE.md
 serve.bat
+prediction/model.cbm
+prediction/model_features.json
+prediction/catboost_info/
+window.json

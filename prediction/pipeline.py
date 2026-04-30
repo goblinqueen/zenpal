@@ -11,8 +11,8 @@ from typing import Callable, NamedTuple
 import pandas as pd
 from catboost import CatBoostClassifier
 
-MODEL_PATH    = '../model.cbm'
-FEATURES_PATH = '../model_features.json'
+MODEL_PATH    = 'prediction/model.cbm'
+FEATURES_PATH = 'prediction/model_features.json'
 
 # ---------------------------------------------------------------------------
 # Account constants
