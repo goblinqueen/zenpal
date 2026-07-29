@@ -8,7 +8,7 @@ import uuid
 import webbrowser
 
 from config import ZEN_API_TOKEN, ZEN_USER
-import zenmoney
+from zenmoney.zenmoney import ZenConnection, Zenmoney
 from zenmoney.op import OPReader
 
 FILENAME     = 'zenmoney.json'
@@ -32,10 +32,10 @@ ACCOUNT_SLOTS = [
 # ---------------------------------------------------------------------------
 
 def load_or_sync(filename=FILENAME, token=ZEN_API_TOKEN, out_diff=None):
-    conn = zenmoney.ZenConnection(token)
+    conn = ZenConnection(token)
     if os.path.exists(filename):
         print('Syncing...')
-        zen = zenmoney.Zenmoney.load(filename)
+        zen = Zenmoney.load(filename)
         conn.sync_timestamp = zen.server_timestamp
         diff = conn.sync(diff=out_diff)
         zen.apply_diff(diff)
@@ -43,7 +43,7 @@ def load_or_sync(filename=FILENAME, token=ZEN_API_TOKEN, out_diff=None):
         print('Sync done.')
     else:
         print('Getting initial data...')
-        zen = zenmoney.Zenmoney(conn.sync())
+        zen = Zenmoney(conn.sync())
         zen.write(filename)
         print('Done.')
     return zen
@@ -139,10 +139,12 @@ MERGE_RULES = [
 ]
 
 
-def find_candidates(transactions, start_date=None):
+def find_candidates(transactions, start_date=None, end_date=None):
     active = [t for t in transactions if not t.get('deleted')]
     if start_date:
         active = [t for t in active if t['date'] >= start_date]
+    if end_date:
+        active = [t for t in active if t['date'] <= end_date]
     incomes  = [t for t in active if t['income'] > 0 and t['outcome'] == 0]
     outcomes = [t for t in active if t['outcome'] > 0 and t['income'] == 0]
     used_inc, used_out = set(), set()

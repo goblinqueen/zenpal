@@ -1,9 +1,9 @@
 """
 ZenPal web interface. Start with: python zp.py serve
 """
-import csv
 import json
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -20,7 +20,6 @@ from prediction.pipeline import Predictor, MANUAL_TAGS
 from prediction.train import train_model
 
 FILENAME   = 'zenmoney.json'
-OUTPUT_CSV = 'review_output.csv'
 WINDOW_PATH = 'window.json'
 WINDOW_DEFAULT = {
     'train_start':   '2024-02-01',
@@ -177,39 +176,24 @@ def build_transactions(start_date, end_date):
 # ---------------------------------------------------------------------------
 
 def parse_form(form):
-    csv_rows, tag_updates = [], []
+    tag_updates = []
     for key, tag_id in form.items():
         if not key.startswith('tag_'):
             continue
         txn_id       = key[4:]
         new_tag_name = form.get(f'new_{txn_id}', '').strip()
-        pred_tag_id  = form.get(f'pred_{txn_id}', '')
 
         if new_tag_name:
-            reviewed_name = new_tag_name
-            reviewed_id   = tag_id_map.get(new_tag_name)
+            reviewed_id = tag_id_map.get(new_tag_name)
         elif tag_id:
-            reviewed_name = tag_map.get(tag_id, '')
-            reviewed_id   = tag_id
+            reviewed_id = tag_id
         else:
-            reviewed_name = ''
-            reviewed_id   = None
+            reviewed_id = None
 
-        csv_rows.append({
-            'transaction_id': txn_id,
-            'predicted_cat':  tag_map.get(pred_tag_id, '') if pred_tag_id else '',
-            'reviewed_cat':   reviewed_name,
-        })
         if reviewed_id:
             tag_updates.append((txn_id, reviewed_id))
-    return csv_rows, tag_updates
+    return tag_updates
 
-
-def save_csv(rows):
-    with open(OUTPUT_CSV, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=['transaction_id', 'predicted_cat', 'reviewed_cat'])
-        writer.writeheader()
-        writer.writerows(rows)
 
 
 def sync_tags(tag_updates):
@@ -269,9 +253,10 @@ _NAV = """
   </form>
 </div>
 <div class="tabs">
-  <a href="/data"    class="tab{% if active=='data'   %} active{% endif %}">Data</a>
-  <a href="/merge"   class="tab{% if active=='merge'  %} active{% endif %}">Merge</a>
-  <a href="/review"  class="tab{% if active=='review' %} active{% endif %}">Review</a>
+  <a href="/data"     class="tab{% if active=='data'   %} active{% endif %}">Data</a>
+  <a href="/merge"    class="tab{% if active=='merge'  %} active{% endif %}">Merge</a>
+  <a href="/review"   class="tab{% if active=='review' %} active{% endif %}">Review</a>
+  <a href="/notebook" class="tab" target="_blank">Notebook ↗</a>
 </div>
 """
 
@@ -342,7 +327,7 @@ table { width:100%; border-collapse:collapse; }
 th { background:#333; color:#fff; padding:6px 8px; text-align:left;
      position:sticky; top:0; z-index:1; font-size:12px; white-space:nowrap; }
 tr:nth-child(even) { background:#f9f9f9; }
-tr:hover { background:#eef3ff; }
+tr:hover { background:#eef3ff; cursor:pointer; }
 tr.reviewed { background:#e8f5e9 !important; }
 tr.reviewed td { opacity:.5; }
 td { padding:5px 8px; border-bottom:1px solid #e8e8e8; vertical-align:middle; }
@@ -374,7 +359,7 @@ input.done-cb { width:15px; height:15px; cursor:pointer; accent-color:#2a7ae2; }
   </form>
 </div>
 
-<form method="get" action="/">
+<form method="get" action="/review">
 <div class="toolbar">
   <label>From</label><input type="date" name="start" value="{{ start }}">
   <label>To</label><input type="date" name="end" value="{{ end }}">
@@ -387,7 +372,6 @@ input.done-cb { width:15px; height:15px; cursor:pointer; accent-color:#2a7ae2; }
   <input type="hidden" name="start" value="{{ start }}">
   <input type="hidden" name="end"   value="{{ end }}">
   <div class="toolbar">
-    <button type="submit" formaction="/save"   class="btn btn-primary">✓ Save CSV</button>
     <button type="submit" formaction="/upload" class="btn btn-success">↑ Upload to Zenmoney</button>
     <button type="button" class="btn btn-secondary" onclick="confirmAll()">Confirm all</button>
     <span class="rev-count"><span id="rc">0</span> / {{ transactions|length }} reviewed</span>
@@ -400,7 +384,7 @@ input.done-cb { width:15px; height:15px; cursor:pointer; accent-color:#2a7ae2; }
   </tr></thead>
   <tbody>
   {% for t in transactions %}
-  <tr>
+  <tr onclick="toggleRow(this, event)">
     <td style="text-align:center">
       <input class="done-cb" type="checkbox" onchange="markRow(this)">
     </td>
@@ -442,6 +426,12 @@ function markRow(cb) {
   cb.closest('tr').classList.toggle('reviewed', cb.checked);
   document.getElementById('rc').textContent = document.querySelectorAll('.done-cb:checked').length;
 }
+function toggleRow(tr, e) {
+  if (e.target.closest('select,input,button,a')) return;
+  const cb = tr.querySelector('.done-cb');
+  cb.checked = !cb.checked;
+  markRow(cb);
+}
 function confirmAll() {
   document.querySelectorAll('select[name^="tag_"]').forEach(s => {
     for (let i = 0; i < s.options.length; i++)
@@ -479,6 +469,17 @@ DATA_TEMPLATE = """<!doctype html><html lang="en"><head>
 .form-row   { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .form-row label { font-size:12px; color:#555; }
 .form-row input[type=date] { padding:5px 8px; border:1px solid #bbb; border-radius:4px; font-size:12px; }
+.bal-table { width:100%; border-collapse:collapse; font-size:12px; }
+.bal-table td { padding:5px 8px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+.bal-table tr:last-child td { border-bottom:none; }
+.bal-name  { font-weight:500; }
+.bal-cur   { color:#555; font-family:monospace; }
+.bal-input { padding:4px 7px; border:1px solid #bbb; border-radius:4px; font-size:12px;
+             width:120px; text-align:right; }
+.bal-input:focus { border-color:#2a7ae2; outline:none; }
+.bal-delta { font-family:monospace; font-size:12px; min-width:80px; text-align:right; }
+.bal-delta.pos { color:#080; }
+.bal-delta.neg { color:#c00; }
 </style></head><body>
 """ + _NAV + """
 {% if message %}<div class="flash {{ 'err' if is_err else '' }}">{{ message }}</div>{% endif %}
@@ -534,8 +535,49 @@ DATA_TEMPLATE = """<!doctype html><html lang="en"><head>
     </div>
   </div>
 
+  <div class="section">
+    <div class="sec-head">⚖ Balance corrections</div>
+    <div class="sec-body">
+      <p class="hint">Enter the actual bank balance next to any account. Leave blank to skip. A Корректировка transaction will be created for each changed value.</p>
+      <form method="post" action="/correction">
+        <table class="bal-table">
+          <thead><tr>
+            <th style="text-align:left;padding:4px 8px;font-size:11px;color:#888;font-weight:normal">Account</th>
+            <th style="text-align:right;padding:4px 8px;font-size:11px;color:#888;font-weight:normal">ZenMoney balance</th>
+            <th style="text-align:right;padding:4px 8px;font-size:11px;color:#888;font-weight:normal">Actual balance</th>
+            <th style="text-align:right;padding:4px 8px;font-size:11px;color:#888;font-weight:normal">Delta</th>
+          </tr></thead>
+          <tbody>
+          {% for acc in correction_accounts %}
+          <tr>
+            <td class="bal-name">{{ acc.title }}</td>
+            <td class="bal-cur" style="text-align:right">{{ '%.2f'|format(acc.balance) }}</td>
+            <td style="text-align:right">
+              <input class="bal-input" type="number" step="0.01"
+                     name="bal_{{ acc.id }}" placeholder="—"
+                     oninput="updateDelta(this, {{ acc.balance }})">
+            </td>
+            <td><span class="bal-delta" id="d_{{ acc.id }}"></span></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        <div style="margin-top:12px">
+          <button class="btn btn-primary">Apply corrections</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
 </div>
 <script>
+function updateDelta(inp, stored) {
+  const el = document.getElementById('d_' + inp.name.slice(4));
+  if (inp.value === '') { el.textContent = ''; el.className = 'bal-delta'; return; }
+  const delta = (parseFloat(inp.value) - stored).toFixed(2);
+  el.textContent = (delta > 0 ? '+' : '') + delta;
+  el.className = 'bal-delta ' + (delta > 0 ? 'pos' : delta < 0 ? 'neg' : '');
+}
 function doPreview() {
   const btn = document.getElementById('prev-btn');
   btn.disabled = true; btn.textContent = 'Loading…';
@@ -578,9 +620,11 @@ MERGE_TEMPLATE = """<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><title>ZenPal — Merge</title>
 <style>""" + _CSS + """
 .content { max-width:760px; margin:0 auto; padding:24px 20px; }
-.toolbar { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.toolbar { display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
 .sub-title { font-size:14px; font-weight:bold; }
 .count  { color:#777; font-size:12px; }
+.toolbar label { font-weight:bold; font-size:12px; }
+.toolbar input[type=date] { padding:4px 7px; border:1px solid #bbb; border-radius:4px; font-size:12px; }
 .pair   { background:#fff; border-radius:6px; margin-bottom:10px; padding:13px 16px;
           box-shadow:0 1px 4px #0001; display:flex; align-items:center; gap:14px; }
 .pair-check { width:16px; height:16px; cursor:pointer; accent-color:#2a7ae2; flex-shrink:0; }
@@ -600,11 +644,15 @@ MERGE_TEMPLATE = """<!doctype html><html lang="en"><head>
 """ + _NAV + """
 {% if message %}<div class="flash">{{ message }}</div>{% endif %}
 <div class="content">
+  <form method="get" action="/merge">
   <div class="toolbar">
-    <span class="sub-title">Transfer pairs — last 30 days</span>
+    <span class="sub-title">Transfer pairs</span>
+    <label>From</label><input type="date" name="start" value="{{ start }}">
+    <label>To</label><input type="date" name="end" value="{{ end }}">
+    <button type="submit" class="btn btn-secondary">Load</button>
     <span class="count">{{ pairs|length }} candidate(s)</span>
-    <a href="/merge" class="btn btn-secondary" style="font-size:11px;padding:3px 11px">↺ Refresh</a>
   </div>
+  </form>
 
   {% if pairs %}
   <form method="post" action="/merge/push">
@@ -637,9 +685,35 @@ MERGE_TEMPLATE = """<!doctype html><html lang="en"><head>
     </div>
   </form>
   {% else %}
-  <div class="none-msg">No transfer candidates found in the last 30 days.</div>
+  <div class="none-msg">No transfer candidates found for {{ start }} → {{ end }}.</div>
   {% endif %}
 </div></body></html>"""
+
+
+# ---------------------------------------------------------------------------
+# Jupyter
+# ---------------------------------------------------------------------------
+
+JUPYTER_PORT = 8889
+JUPYTER_URL  = f'http://localhost:{JUPYTER_PORT}'
+_jupyter_proc: subprocess.Popen | None = None
+
+def _start_jupyter():
+    global _jupyter_proc
+    if _jupyter_proc is not None and _jupyter_proc.poll() is None:
+        return  # already running
+    _jupyter_proc = subprocess.Popen(
+        ['jupyter', 'lab', '--no-browser',
+         f'--port={JUPYTER_PORT}',
+         '--ServerApp.token=', '--ServerApp.password='],
+        cwd=os.path.dirname(os.path.abspath(__file__)),
+    )
+
+
+@app.route('/notebook')
+def notebook():
+    _start_jupyter()
+    return redirect(JUPYTER_URL)
 
 
 # ---------------------------------------------------------------------------
@@ -648,7 +722,7 @@ MERGE_TEMPLATE = """<!doctype html><html lang="en"><head>
 
 @app.route('/')
 def index():
-    return redirect(url_for('review'))
+    return redirect(url_for('data'))
 
 @app.route('/review')
 def review():
@@ -660,24 +734,15 @@ def review():
                                   tags=tags_sorted, start=start, end=end, window=w,
                                   message=request.args.get('message', ''))
 
-@app.route('/save', methods=['POST'])
-def save():
-    start = request.form.get('start', '')
-    end   = request.form.get('end', '')
-    rows, _ = parse_form(request.form)
-    save_csv(rows)
-    return redirect(url_for('review', start=start, end=end,
-                            message=f'Saved {len(rows)} row(s) to {OUTPUT_CSV}'))
-
 @app.route('/upload', methods=['POST'])
 def upload():
     start = request.form.get('start', '')
     end   = request.form.get('end', '')
-    rows, tag_updates = parse_form(request.form)
-    save_csv(rows)
+    tag_updates = parse_form(request.form)
     n = sync_tags(tag_updates)
+    _reload_zen()
     return redirect(url_for('review', start=start, end=end,
-                            message=f'Uploaded {n} tag(s), saved {len(rows)} row(s)'))
+                            message=f'Uploaded {n} tag(s)'))
 
 @app.route('/advance', methods=['POST'])
 def advance():
@@ -748,10 +813,46 @@ def data():
         {'name': os.path.basename(p), 'label': label, 'exists': os.path.exists(p)}
         for p, _id, label in slots
     ]
+    correction_accounts = sorted(
+        [a for a in zen.account if not a.get('archive')],
+        key=lambda a: -a['balance']
+    )
     return render_template_string(DATA_TEMPLATE, active='data', detected=detected,
                                   downloads_dir=DOWNLOADS,
+                                  correction_accounts=correction_accounts,
                                   message=request.args.get('message', ''),
                                   is_err=request.args.get('err', '0') == '1')
+
+
+@app.route('/correction', methods=['POST'])
+def correction():
+    diffs = []
+    errors = []
+    for key, val in request.form.items():
+        if not key.startswith('bal_') or val.strip() == '':
+            continue
+        account_id = key[4:]
+        try:
+            actual = float(val)
+        except ValueError:
+            errors.append(f'Invalid value for {account_id}: {val}')
+            continue
+        diff = zen.make_correction(account_id, actual)
+        if diff:
+            diffs.extend(diff['transaction'])
+
+    if errors:
+        return redirect(url_for('data', message=' | '.join(errors), err='1'))
+    if not diffs:
+        return redirect(url_for('data', message='No corrections needed (all balances match).'))
+
+    conn = zenmod.ZenConnection(ZEN_API_TOKEN)
+    conn.sync_timestamp = zen.server_timestamp
+    result = conn.sync({'transaction': diffs})
+    zen.apply_diff(result)
+    zen.write(FILENAME)
+    _reload_zen()
+    return redirect(url_for('data', message=f'Applied {len(diffs)} correction(s).'))
 
 @app.route('/sync', methods=['POST'])
 def sync():
@@ -910,8 +1011,11 @@ def reimport():
 @app.route('/merge')
 def merge():
     from datetime import date, timedelta
-    since      = (date.today() - timedelta(days=30)).isoformat()
-    candidates = find_candidates(zen.transaction, start_date=since)
+    default_start = (date.today() - timedelta(days=30)).isoformat()
+    default_end   = date.today().isoformat()
+    since = request.args.get('start', default_start)
+    until = request.args.get('end', default_end)
+    candidates = find_candidates(zen.transaction, start_date=since, end_date=until)
 
     pairs = []
     for inc, out in candidates:
@@ -930,6 +1034,7 @@ def merge():
         })
 
     return render_template_string(MERGE_TEMPLATE, active='merge', pairs=pairs,
+                                  start=since, end=until,
                                   message=request.args.get('message', ''))
 
 @app.route('/merge/push', methods=['POST'])
