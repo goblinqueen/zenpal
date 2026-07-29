@@ -70,13 +70,18 @@ class Zenmoney:
 
     def apply_diff(self, diff: dict) -> None:
         for field_name in ['instrument', 'company', 'user', 'account',
-                           'tag', 'merchant', 'budget', 'reminder', 'reminderMarker', 'transaction']:
+                           'tag', 'merchant', 'reminder', 'reminderMarker', 'transaction']:
             if field_name in diff:
                 existing = {x['id']: x for x in self._zdict.get(field_name, [])}
                 for item in diff[field_name]:
                     existing[item['id']] = item
                 self._zdict[field_name] = list(existing.values())
                 print(f"Updated {field_name}: {len(diff[field_name])} item(s)")
+
+        # budget has no 'id' — just replace the whole list
+        if 'budget' in diff:
+            self._zdict['budget'] = diff['budget']
+            print(f"Updated budget: {len(diff['budget'])} item(s)")
 
             if 'deletion' in diff:
                 for del_item in diff['deletion']:
@@ -98,6 +103,54 @@ class Zenmoney:
         import time
         txn = next(t for t in self.transaction if t['id'] == transaction_id)
         return {'transaction': [{**txn, 'tag': tag_ids, 'changed': int(time.time())}]}
+
+    def make_correction(self, account_id: str, actual_balance: float, date: str | None = None) -> dict | None:
+        """Return a diff with a balance-correction transaction, or None if delta is zero."""
+        import time, uuid
+        from datetime import date as _date
+        account = next((a for a in self.account if a['id'] == account_id), None)
+        if account is None:
+            raise ValueError(f'Account {account_id} not found')
+        delta = round(actual_balance - account['balance'], 2)
+        if delta == 0:
+            return None
+        user_id  = account['user']
+        instr    = account['instrument']
+        now      = int(time.time())
+        txn_date = date or _date.today().isoformat()
+        txn = {
+            'id':                   str(uuid.uuid4()),
+            'user':                 user_id,
+            'date':                 txn_date,
+            'income':               delta if delta > 0 else 0,
+            'outcome':              -delta if delta < 0 else 0,
+            'incomeAccount':        account_id,
+            'outcomeAccount':       account_id,
+            'incomeInstrument':     instr,
+            'outcomeInstrument':    instr,
+            'tag':                  [],
+            'comment':              'Корректировка',
+            'payee':                None,
+            'originalPayee':        None,
+            'merchant':             None,
+            'changed':              now,
+            'created':              now,
+            'deleted':              False,
+            'hold':                 False,
+            'viewed':               True,
+            'qrCode':               None,
+            'source':               None,
+            'opIncome':             None,
+            'opOutcome':            None,
+            'opIncomeInstrument':   None,
+            'opOutcomeInstrument':  None,
+            'incomeBankID':         None,
+            'outcomeBankID':        None,
+            'reminderMarker':       None,
+            'latitude':             None,
+            'longitude':            None,
+        }
+        return {'transaction': [txn]}
 
 
     def get_by_value(self, prop, field, value):
